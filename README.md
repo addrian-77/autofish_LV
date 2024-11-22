@@ -27,6 +27,7 @@ Pentru instalare descarcati si copiati **auto.fish.cs** in folderul **CLEO** (Ig
 ```cpp
 {$CLEO}
 {$INCLUDE SF}
+{$USE bitwise}
 
 0000:
 
@@ -47,162 +48,188 @@ const
     __GRN = 0x4ae072
     __GRA = 0xcfcfcf
 end
-
 chatmsg "{%x}Auto Fish LV {%x}mod by {%x}iAdriaN {%x}was loaded, {%x}[/setdelay <ms>]{%x}." -1 __WHT __BLU __WHT __BLU __YLW __BLU
 chatmsg "{%x}Use {%x}[/autofish] {%x}to toggle the mod {%x}ON {%x}or {%x}OFF." -1 __GRA __YLW __GRA __GRN __GRA __RED             
-chatmsg "{%x}Use {%x}[/togdriver] {%x}to toggle auto animations {%x}ON {%x}or {%x}OFF." -1 __GRA __YLW __GRA __GRN __GRA __RED
+chatmsg "{%x}Use {%x}[/togdriver] {%x}to toggle auto animations {%x}ON {%x}or {%x}OFF." -1 __GRA __YLW __GRA __GRN __GRA __RED   
 
 // Register the custom command /setdelay
 0B34: samp register_client_command "setdelay" to_label @set_delay
-3@ = 0 // Default delay set to 0ms
-5@ = 0
 
 // Register the custom command /autofish
 0B34: samp register_client_command "autofish" to_label @auto_fish
-6@ = 1 // Default value, the mod is turned on
-7@ = 0
-
-10@ = 0 // Player not in store area
 
 // Register the custom command /togdriver
 0B34: samp register_client_command "togdriver" to_label @tog_driver
-11@ = 0 // Default value, not a driver
-8@ = 0 // Command not initialized
-:set_delay
-if SAMP.IsCommandTyped(0@)
-then
-    if 0AD4: $NOT_CMD = scan_string 0@ format "%d" 3@ // Scan for a single integer after "/setdelay"
-    then
-        chatmsg "{%x}<{%x}!!!{%x}> {%x}Delay set to: %d ms" -1 __RED __WHT __RED __WHT 3@ // Show confirmation message
-    else
-        chatmsg "{%x}<{%x}!!!{%x}> {%x}Error: invalid value" -1 __RED __WHT __RED __WHT // Show error if no number is provided
-    end
-else
-    if 5@ == 1
-    then
-        chatmsg "{%x}<{%x}!!!{%x}> {%x}Syntax: {%x}[/setdelay <ms>]" -1 __RED __WHT __RED __WHT __YLW
-    else
-        5@ = 1
-    end
-end
-SAMP.CmdRet()
 
-:auto_fish
-if 7@ == 1
-then
-    if 6@ == 1
+int var_delay = 0 // Default delay set to 0ms
+int var_enabled = 1 // Default value, the mod is turned on
+int var_storeArea = 0 // Player not in store area
+int var_isDriver = 0 // Default value, not a driver
+int var_enteredStore = 0
+int var_not_used
+int var_sphere1
+int var_sphere2
+float var_posX     
+float var_posY     
+float var_posZ
+longstring var_param  
+03BC: var_sphere1 = create_sphere_at 1693.9500 2207.9600 11.0692 radius 2.0
+03BC: var_sphere2 = create_sphere_at -31.0246 -91.3283 1003.5469 radius 2.0
+        
+
+while true
+    wait 0
+
+    if and
+    var_enabled == 1
+    var_enteredStore == 0 
+    00ED: actor $PLAYER_ACTOR sphere 0 near_point 1693.9500 2207.9600 radius 1.0 1.0 on_foot
     then
-        6@ = 0
-        chatmsg "{%x}Auto Fish {%x}disabled" -1 __WHT __RED
-    else
-        6@ = 1
-        chatmsg "{%x}Auto Fish {%x}enabled" -1 __WHT __GRN
+        0C72: set_virtual_key 13 down true
+        wait 1
+        0C73: set_char_key 13 down false
+        var_enteredStore = 1
+        while var_enteredStore == 1
+            wait 0
+            if var_enabled == 0
+            then
+                break
+            end
+            if
+            00ED: actor $PLAYER_ACTOR sphere 0 near_point -31.0246 -91.3283 radius 1.0 1.0 on_foot
+            then
+                0C72: set_virtual_key 13 down true
+                wait 1
+                0C73: set_char_key 13 down false
+                break
+            end  
+        end
     end
-else
-    7@ = 1
-end
-SAMP.CmdRet()
-
-:tog_driver
-if 8@ == 1
-then
-    if 11@ == 0
-    then
-        11@ = 1
-        chatmsg "{%x}<{%x}!!!{%x}> {%x}You are now a {%x}driver{%x}, animations won't be applied" -1 __WHT __RED __WHT __GRA __RED __GRA
-    else
-        11@ = 0
-        chatmsg "{%x}<{%x}!!!{%x}> {%x}You are not a {%x}driver{%x} anymore, animations will be applied" -1 __WHT __RED __WHT __GRA __RED __GRA
-    end
-else
-    8@ = 1
-end
-SAMP.CmdRet()
-
-:main_loop
-wait 0
-
-if 6@ == 1
-then
-    if Player.Defined($PLAYER_CHAR)
-    then
-        if not Actor.Driving($PLAYER_ACTOR)
-        then
-            // Get player position
-            00A0: store_actor $PLAYER_ACTOR position_to 0@ 1@ 2@
     
-            // Check if the player is in the fish zone, after finishing use /fall for safe transport
-            if and 
-            0@ > 2012.0725 
-            0@ < 2015.5298 
-            1@ > 1511.0432 
-            1@ < 1539.7081 // min x, max x, min y, max y bounradies
+    if var_enabled == 1
+    then
+        if Player.Defined($PLAYER_CHAR)
+        then
+            if not Actor.Driving($PLAYER_ACTOR)
             then
-                wait 3@ // Wait based on the delay set
-                say "/fish" // Execute the /fish command
-                wait 25000 // Wait 25 seconds, it takes 20 seconds to catch a fish
-                if not Actor.Driving($PLAYER_ACTOR)
-                then
-                    if 11@ == 0 // Check if the player is a driver and needs animations
-                    then
-                        say "/fall"
-                    end
-                end
-                wait 15000 // Wait 15 more seconds in order not to spam the animation, we won't be back this quick anyway
-            end
-
-            
-            // Check if the player entered the store area, to cancel the animation
-            if 11@ == 0 // Check if the player is a driver or not
-            then
+                // Get player position
+                00A0: store_actor $PLAYER_ACTOR position_to var_posX var_posY var_posZ
+        
+                // Check if the player is in the fish zone, after finishing use /fall for safe transport
                 if and 
-                0@ > 1679.3840 
-                0@ < 1716.7549 
-                1@ > 2184.2734 
-                1@ < 2210.0962 // min x, max x, min y, max y boundaries
+                var_posX > 2012.0725 
+                var_posX < 2015.5298 
+                var_posY > 1511.0432 
+                var_posY < 1539.7081 // min x, max x, min y, max y bounradies
                 then
+                    wait var_delay // Wait based on the delay set
+                    say "/fish" // Execute the /fish command
+                    wait 25000 // Wait 25 seconds, it takes 20 seconds to catch a fish
                     if not Actor.Driving($PLAYER_ACTOR)
                     then
-                        if 10@ == 0 // Check if the store was visited so that we don't spam the /stop command. Using a wait delay is not viable here
+                        if var_isDriver == 0 // Check if the player is a driver and needs animations
                         then
-                            if 3@ == 0 // Use a delay, either the set one or the default 1 second
+                            say "/fall"
+                        end
+                    end
+                    wait 15000 // Wait 15 more seconds in order not to spam the animation, we won't be back this quick anyway
+                end
+    
+                
+                // Check if the player entered the store area, to cancel the animation
+                if var_isDriver == 0 // Check if the player is a driver or not
+                then
+                    if and 
+                    var_posX > 1679.3840 
+                    var_posX < 1716.7549 
+                    var_posY > 2184.2734 
+                    var_posY < 2210.0962 // min x, max x, min y, max y boundaries
+                    then
+                        if not Actor.Driving($PLAYER_ACTOR)
+                        then
+                            if var_storeArea == 0 // Check if the store was visited so that we don't spam the /stop command. Using a wait delay is not viable here
                             then
-                                wait 1000
+                                if var_delay == 0 // Use a delay, either the set one or the default 1 second
+                                then
+                                    wait 1000
+                                end
+                                say "/stop"
+                                
+                                var_storeArea = 1 // Mark the store as visited
                             end
-                            say "/stop"
-                            10@ = 1 // Mark the store as visited
+                        end
+                    end
+                
+                    // Use the animation again when the player exits the store area
+                    if and 
+                    var_posX > 1679.3840 
+                    var_posX < 1716.7549 
+                    var_posY > 2175.3044 
+                    var_posY < 2184.2734 // min x, max x, min y, max y boundaries
+                    then
+                        if not Actor.Driving($PLAYER_ACTOR)
+                        then
+                            if var_storeArea == 1 // If the store was visited previously, it means that the player just left and needs to use the animation again
+                            then
+                                if var_delay == 0 // Use a wait delay, either the set one or the default 1 second
+                                then
+                                    wait 1000
+                                else
+                                    wait var_delay
+                                end
+                                say "/fall"            
+                                var_storeArea = 0 // Mark the store as not visited 
+                                var_enteredStore = 0
+                            end
                         end
                     end
                 end
-            
-                // Use the animation again when the player exits the store area
-                if and 
-                0@ > 1679.3840 
-                0@ < 1716.7549 
-                1@ > 2175.3044 
-                1@ < 2184.2734 // min x, max x, min y, max y boundaries
-                then
-                    if not Actor.Driving($PLAYER_ACTOR)
-                    then
-                        if 10@ == 1 // If the store was visited previously, it means that the player just left and needs to use the animation again
-                        then
-                            if 3@ == 0 // Use a wait delay, either the set one or the default 1 second
-                            then
-                                wait 1000
-                            else
-                                wait 3@
-                            end
-                            say "/fall"            
-                            10@ = 0 // Mark the store as not visited 
-                        end
-                    end
-                end
+                
             end
-            
         end
     end
 end
 
-jump @main_loop
+:set_delay
+if 0B35: samp var_param = get_last_command_params
+then
+    var_delay = 0
+    if 0AD4: var_not_used = scan_string var_param format "%d" var_delay // Scan for a single integer after "/setdelay"
+    then
+        chatmsg "{%x}<{%x}!!!{%x}> {%x}Delay set to: %d ms" -1 __RED __WHT __RED __WHT var_delay // Show confirmation message
+    else
+        chatmsg "{%x}<{%x}!!!{%x}> {%x}Error: invalid value" -1 __RED __WHT __RED __WHT // Show error if no number is provided
+    end
+else
+    chatmsg "{%x}<{%x}!!!{%x}> {%x}Syntax: {%x}[/setdelay <ms>]" -1 __RED __WHT __RED __WHT __YLW
+end
+SAMP.CmdRet()
+
+:auto_fish
+if var_enabled == 1
+then
+    var_enabled = 0
+    chatmsg "{%x}Auto Fish {%x}disabled" -1 __WHT __RED
+    03BD: destroy_sphere var_sphere1
+    03BD: destroy_sphere var_sphere2
+else
+    var_enabled = 1
+    var_enteredStore = 0
+    chatmsg "{%x}Auto Fish {%x}enabled" -1 __WHT __GRN
+    03BC: var_sphere1 = create_sphere_at 1693.9500 2207.9600 11.0692 radius 2.0
+    03BC: var_sphere2 = create_sphere_at -31.0246 -91.3283 1003.5469 radius 2.0
+end
+SAMP.CmdRet()
+
+:tog_driver
+if var_isDriver == 0
+then
+    var_isDriver = 1
+    chatmsg "{%x}<{%x}!!!{%x}> {%x}You are now a {%x}driver{%x}, animations won't be applied" -1 __WHT __RED __WHT __GRA __RED __GRA
+else
+    var_isDriver = 0
+    chatmsg "{%x}<{%x}!!!{%x}> {%x}You are not a {%x}driver{%x} anymore, animations will be applied" -1 __WHT __RED __WHT __GRA __RED __GRA
+end
+SAMP.CmdRet()
 ```
 </details>
