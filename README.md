@@ -1,4 +1,4 @@
-# Autofish LV
+# Autofish LV - SF
 **Pentru a descarca modul, apasati pe butonul <>Code, iar apoi pe Download ZIP**
 #
 
